@@ -1,7 +1,8 @@
 #!/usr/bin/python2 -tt
 
 import sys
-import subprocess import urllib2 
+import subprocess 
+import urllib2 
 import json
 
 class Fingerprint(object):
