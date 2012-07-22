@@ -47,8 +47,12 @@ def tag_all_files(directory):
 	for afile in afiles:
 		fp=Fingerprint(os.path.join(directory,afile))
 		query=acoustid_query(fp.fingerprint,fp.duration)
-		result=urllib2.urlopen(query)
+		try:
+			result=urllib2.urlopen(query)
+		except urllib2.HTTPError:
+			print 'HTTP Access Error'
 		parsed_result = AcoustidResult(result)
+		#Arbitrary function to extract AcoustID score
 		score_key = lambda acoustid : int(parsed_result.scores[acoustid])
 		parsed_result.acoustids.sort(key=score_key)
 		best_match=max(parsed_result.acoustids, key=score_key)
