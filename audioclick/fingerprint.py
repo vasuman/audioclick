@@ -1,12 +1,11 @@
 #!/usr/bin/python2 -tt
 
 import sys
-import subprocess
-import urllib2
+import subprocess import urllib2 
 import json
 
 class Fingerprint(object):
-	
+	'''Object that calls the fpcalc command line tool on given audio file'''
 	def __init__(self, filename):
 		(self.fingerprint, self.duration)= self.fpcalc(filename)
 	
@@ -18,10 +17,12 @@ class Fingerprint(object):
 		return (fingerprint, duration)
 
 def acoustid_query(fingerprint, duration, meta='recordingids', apikey='8XaBELgH'):
+	'''Generates an AcoustID query'''
 	fpquery='http://api.acoustid.org/v2/lookup?client='+apikey+'&meta='+meta+'&duration='+duration+'&fingerprint='+fingerprint
 	return fpquery
 
 class AcoustidResult(object):
+	'''Object parses the AcoustID server JSON response'''
 	def __init__(self, result):
 		parsedresult=json.loads(result.read())
 		self.status=parsedresult['status'] 
@@ -38,6 +39,8 @@ class AcoustidResult(object):
 					mbids.append(recording['id'])
 				self.mbids[item['id']]=mbids
 
+
+#Can be run for debugging prints AcoustIDs and associated MBIDs to stdout
 if __name__=='__main__':
 	fp=Fingerprint(sys.argv[1])
 	query=acoustid_query(fp.fingerprint,fp.duration)
