@@ -1,6 +1,7 @@
 #!/usr/bin/python2 -tt
 
 import musicbrainzngs as mb
+
 mb.set_useragent('AudioClick','0.1dev')
 
 def request_release(releases):
@@ -22,7 +23,8 @@ def extract_year(release):
 		year=int(release['date'].replace('-','')[:4])
 	return -1
 
-def single_recording_lookup(mbid, func=request_release):
+def single_recording_lookup(mbids, func=request_release):
+	mbid=mbids[0]
 	rec_info=mb.get_recording_by_id(mbid,['artists','releases'],['official'])['recording']
 	track={}
 	track['title']=rec_info['title']
@@ -54,6 +56,7 @@ def match_recordings(mbids):
 		try:
 			mbid_info=mb.get_recording_by_id(mbid,['artists','releases'],['official'])['recording']
 		except mb.musicbrainz.ResponseError :
+			print 'Invalid MusicBrainz Response'
 			continue
 		mbid_rlist=mbid_info['release-list']
 		mbid_rec[mbid]=mbid_info
