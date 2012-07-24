@@ -30,7 +30,7 @@ def write_tags_to_file(track,audiofile):
 	tag_function[extension](track,audiofile)
 
 
-def rename_files(track,audiofile,directory):
+def rename_file(track,audiofile,directory):
 	src=os.path.join(directory,audiofile)
 	trackname=track['artist']+' - '+track['title']+'.mp3'
 	dst=os.path.join(directory,trackname)
