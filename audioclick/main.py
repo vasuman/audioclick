@@ -1,7 +1,8 @@
 #!/usr/bin/python2 -tt
 
+import mutagen
 from mutagen.easyid3 import EasyID3
-from fingerprint import Fingerprint,acoustid_query,AcoustidResult
+from fingerprint import *
 import mblookup
 import os
 import sys
@@ -11,20 +12,21 @@ import logging
 _version='0.1dev'
 _appname='AudioClick'
 
+
 #Define all tag functions here
 def tag_id3(track,audiofile):	
 	try:
 		id3obj=EasyID3(audiofile)
 		id3obj.delete()
-	except mutagen.easyID3.EasyID3Error:
-		print "Adding ID3 header;"
+	except mutagen.id3.ID3NoHeaderError:
+		log.info("Adding ID3 header for file {0}".format(audiofile))
 	id3obj = EasyID3()	
 	for item in track.keys():
 		if item in id3obj.valid_keys.keys():
 			id3obj[item]=track[item]
 	id3obj.save(audiofile)
 
-#Add extensions and corresponding tag functions now
+#Add extensions and corresponding tag functions 
 tag_function={'mp3':tag_id3}
 
 def write_tags_to_file(track,audiofile):
@@ -32,9 +34,10 @@ def write_tags_to_file(track,audiofile):
 	extension=audiofile[-3:].lower()
 	tag_function[extension](track,audiofile)
 
-def rename_file(track,audiofile,directory):
-	src=os.path.join(directory,audiofile)
-	trackname=track['artist']+' - '+track['title']+audiofile[-3:].lower()
+def rename_file(track,audiofile):
+	directory=os.path.dirname(audiofile)
+	src=audiofile
+	trackname=u'{0} - {1}.{2}'.format(track['artist'],track['title'],audiofile[-3:].lower())
 	dst=os.path.join(directory,trackname)
 	os.rename(src,dst)
 
@@ -48,34 +51,56 @@ def tag_all_files(directory):
 			afiles.append(file)
 	print afiles
 	for afile in afiles:
-		tag_file(directory,afile)
+		return_code=tag_file(os.path.abspath(os.path.join(directory,afile)))
+		if return_code in (2,3):
+			log.critical('Critical Error! Terminating....')
+			return
 
-def tag_file(directory,afile):
-	fp=Fingerprint(os.path.join(directory,afile))
+def tag_file(afile):
+	try:
+		fp=Fingerprint(afile)
+	except FingerprintError as e:
+		if e.errno==1:
+			log.critical('Chromaprint is not installed')
+		elif e.errno==2:
+			log.warning('File {0} doesn\'t have a valid audio stream. Skipping...'.format(afile))
+			return 1
 	query=acoustid_query(fp.fingerprint,fp.duration)
 	try:
 		result=urllib2.urlopen(query)
-	except urllib2.HTTPError:
-		print 'HTTP Access Error'
+	except urllib2.HTTPError as e:
+		if e.code==401:
+			log.error('HTTP Authentication Error. Invalid API key. Exiting...')
+			return 2
+	except urllib2.URLError as e:
+		if e.args[0][0]==-2:
+			log.error('Unable to resolve hostname. Check internet connection. Exiting...')
+			return 3
+	#Parsing JSON result from server
 	parsed_result = AcoustidResult(result)
+	if parsed_result.mbids=={}:
+		log.warning('Track : {0} doesn\'t have an MBID. Skipping...'.format(afile))
+		return 4
 	#Arbitrary function to extract AcoustID score
 	score_key = lambda acoustid : int(parsed_result.scores[acoustid])
+	#Ranking according to AcoustID score
 	parsed_result.acoustids.sort(key=score_key)
-	#best_match=max(parsed_result.acoustids, key=score_key)
-	for acoustid in parsed_result.acoustids:
-		if not acoustid in parsed_result.mbids:
-			print 'AcoustID : {0} doesn\'t have an associated MusicBrainz ID'.format(acoustid)
-			continue
-		mbids=parsed_result.mbids[acoustid]
-		track=mblookup.match_recordings(mbids)
-		print track
-	#write_tags_to_file(track,os.path.join(directory,afile))
-	#rename_files(track,afile,directory)
+	#Finding best match
+	print parsed_result.scores
+	best_match=max(parsed_result.mbids.keys(), key=score_key)
+	mbids=parsed_result.mbids[best_match]
+	log.info('File {0} matched with {1}% accuracy'.format(os.path.basename(afile),str(parsed_result.scores[best_match]*100)))
+	#Lookin up MusicBrainz database
+	track=mblookup.match_recordings(mbids)
+	#Cleaning up tags and filenames
+	write_tags_to_file(track,afile)
+	rename_file(track,afile)
+	#Success
+	return 0
 
 if __name__=='__main__':
-	if len(sys.argv)<2 :
-		directory=os.path.abspath(os.path.curdir)
-	else :
-		directory=os.path.abspath(sys.argv[1])
-	
+	logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s:%(message)s')
+	log=logging.getLogger(__name__)
+	log.info('New instance started')
+	directory=os.path.abspath(sys.argv[1])
 	tag_all_files(directory)
