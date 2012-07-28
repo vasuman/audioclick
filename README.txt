@@ -11,4 +11,5 @@ Version - 0.1dev
 1.Python 2.7
 2.Chromaprint 0.8
 3.FFmpeg
-4.x264
+4.Mutagen
+5.MusicBrainzNGS
