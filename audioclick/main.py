@@ -49,14 +49,15 @@ def tag_all_files(directory):
 	for file in files:
 		if file[-3:] in supported_extensions:
 			afiles.append(file)
-	print afiles
 	for afile in afiles:
-		return_code=tag_file(os.path.abspath(os.path.join(directory,afile)))
+		afile_abspath=os.path.abspath(os.path.join(directory,afile))
+		(return_code,parsed_result)=fingerprint_file(afile_abspath)
 		if return_code in (2,3):
 			log.critical('Critical Error! Terminating....')
 			return
+		tag_file(afile_abspath,parsed_result)
 
-def tag_file(afile):
+def fingerprint_file(afile):
 	try:
 		fp=Fingerprint(afile)
 	except FingerprintError as e:
@@ -64,23 +65,26 @@ def tag_file(afile):
 			log.critical('Chromaprint is not installed')
 		elif e.errno==2:
 			log.warning('File {0} doesn\'t have a valid audio stream. Skipping...'.format(afile))
-			return 1
+			return (1,None)
 	query=acoustid_query(fp.fingerprint,fp.duration)
 	try:
 		result=urllib2.urlopen(query)
 	except urllib2.HTTPError as e:
 		if e.code==401:
 			log.error('HTTP Authentication Error. Invalid API key. Exiting...')
-			return 2
+			return (2,None)
 	except urllib2.URLError as e:
 		if e.args[0][0]==-2:
 			log.error('Unable to resolve hostname. Check internet connection. Exiting...')
-			return 3
+			return (3,None)
 	#Parsing JSON result from server
 	parsed_result = AcoustidResult(result)
+	return (0,parsed_result)
+
+def tag_file(afile,parsed_result):
 	if parsed_result.mbids=={}:
-		log.warning('Track : {0} doesn\'t have an MBID. Skipping...'.format(afile))
-		return 4
+		log.warning('Track : {0} doesn\'t have an MBID. Skipping...'.format(os.path.basename(afile)))
+		return 1
 	#Arbitrary function to extract AcoustID score
 	score_key = lambda acoustid : int(parsed_result.scores[acoustid])
 	#Ranking according to AcoustID score
@@ -89,9 +93,9 @@ def tag_file(afile):
 	print parsed_result.scores
 	best_match=max(parsed_result.mbids.keys(), key=score_key)
 	mbids=parsed_result.mbids[best_match]
-	log.info('File {0} matched with {1}% accuracy'.format(os.path.basename(afile),str(parsed_result.scores[best_match]*100)))
+	log.info('File {0} matched with {1}% accuracy'.format(os.path.basename(afile),parsed_result.scores[best_match]*100))
 	#Lookin up MusicBrainz database
-	track=mblookup.match_recordings(mbids)
+	track=mblookup.single_match(mbids)
 	#Cleaning up tags and filenames
 	write_tags_to_file(track,afile)
 	rename_file(track,afile)
