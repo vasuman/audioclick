@@ -1,4 +1,6 @@
 
+import urllib2
+import json
 import musicbrainzngs as mb
 import logging
 
@@ -41,7 +43,7 @@ def match_recording(mbids):
 		try:
 			mbid_info=mb.get_recording_by_id(mbid,['artists','releases'],['official'])['recording']
 		except mb.musicbrainz.ResponseError :
-			logging.info('{0} is an invalid MusicBrainz ID. Skipping...'.format(mbid))
+			logging.warning('{0} is an invalid MusicBrainz ID. Skipping...'.format(mbid))
 			continue
 		mbid_rlist=mbid_info['release-list']
 		mbid_rec[mbid]=mbid_info
@@ -50,8 +52,21 @@ def match_recording(mbids):
 		release_list.extend(mbid_rlist)
 	return (mbid_rec, release_list)
 
+def fetch_cover_art(release_mbid):
+	query_url='http://coverartarchive.org/release/{0}'.format(release_mbid)
+	try:
+		response=urllib2.urlopen(query_url)
+	except urllib2.HTTPError as e:
+		if e.code==404:
+			return (1,'')
+	result=json.loads(response.read())['images']
+	img_url=result[0]['image']
+	img_data=urllib2.urlopen(img_url)
+	return (0,img_data)
+
+	
 #Yet to be implemented
-def match_album(tracked_mbids):
+def album_match(tracked_mbids):
 	all_releases=[]
 	album_match={}
 	for mbids in tracked_mbids:

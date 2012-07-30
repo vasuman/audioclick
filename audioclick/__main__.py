@@ -1,6 +1,8 @@
 #!/usr/bin/python2 -tt
 
 import mutagen
+from mutagen.mp3 import MP3
+from mutagen.id3 import ID3, APIC
 from mutagen.easyid3 import EasyID3
 from fingerprint import *
 import mblookup
@@ -14,8 +16,9 @@ _appname='AudioClick'
 
 
 #Define all tag functions here
-def tag_id3(track,audiofile):	
+def tag_id3(track,audiofile,img_data):	
 	try:
+	#Removing existing tags
 		id3obj=EasyID3(audiofile)
 		id3obj.delete()
 	except mutagen.id3.ID3NoHeaderError:
@@ -24,20 +27,32 @@ def tag_id3(track,audiofile):
 	for item in track.keys():
 		if item in id3obj.valid_keys.keys():
 			id3obj[item]=track[item]
+	if not img_data=='':
+		afile_id3=MP3(audiofile, ID3=ID3)
+		afile_id3.tags.add(
+			APIC(
+				encoding=3,
+				mime='image/jpeg',
+				type=3,
+				desc=u'Cover',
+				data=img_data
+			)
+		)
+		afile_id3.save(audiofile)
 	id3obj.save(audiofile)
 
 #Add extensions and corresponding tag functions 
 tag_function={'mp3':tag_id3}
 
-def write_tags_to_file(track,audiofile):
+def write_tags_to_file(track,audiofile,img_data=''):
 	global tag_function
 	extension=audiofile[-3:].lower()
-	tag_function[extension](track,audiofile)
+	tag_function[extension](track,audiofile,img_data)
 
 def rename_file(track,audiofile):
 	directory=os.path.dirname(audiofile)
 	src=audiofile
-	trackname=u'{0} - {1}.{2}'.format(track['artist'],track['title'],audiofile[-3:].lower())
+	trackname=u"{0} - {1}.{2}".format(track['artist'],track['title'],audiofile[-3:].lower())
 	dst=os.path.join(directory,trackname)
 	os.rename(src,dst)
 
@@ -54,8 +69,9 @@ def tag_all_files(directory):
 		(return_code,parsed_result)=fingerprint_file(afile_abspath)
 		if return_code in (2,3):
 			log.critical('Critical Error! Terminating....')
-			return
+			return return_code
 		tag_file(afile_abspath,parsed_result)
+	return 0
 
 def fingerprint_file(afile):
 	try:
@@ -90,12 +106,16 @@ def tag_file(afile,parsed_result):
 	#Ranking according to AcoustID score
 	parsed_result.acoustids.sort(key=score_key)
 	#Finding best match
-	print parsed_result.scores
 	best_match=max(parsed_result.mbids.keys(), key=score_key)
 	mbids=parsed_result.mbids[best_match]
 	log.info('File {0} matched with {1}% accuracy'.format(os.path.basename(afile),parsed_result.scores[best_match]*100))
 	#Lookin up MusicBrainz database
 	track=mblookup.single_match(mbids)
+	log.info('{0} identified as {1} by {2}'.format(os.path.basename(afile), track['title'], track['artist']))
+	#Fetching Cover art
+	(img_ret,img_data)=mblookup.fetch_cover_art(track['musicbrainz_albumid'])
+	if img_ret:
+		log.warning('Album {0} doesn\'t have a cover image'.format(track['album']))
 	#Cleaning up tags and filenames
 	write_tags_to_file(track,afile)
 	rename_file(track,afile)
@@ -107,4 +127,7 @@ if __name__=='__main__':
 	log=logging.getLogger(__name__)
 	log.info('New instance started')
 	directory=os.path.abspath(sys.argv[1])
-	tag_all_files(directory)
+	if not os.path.isdir(directory):
+		log.critical('{0} is not a directory'.format(directory))
+		sys.exit(1)
+	sys.exit(tag_all_files(directory))
