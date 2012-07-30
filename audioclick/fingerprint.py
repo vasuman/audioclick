@@ -26,12 +26,12 @@ class Fingerprint(object):
 			if e.errno==2:
 				raise FingerprintError(1,'Chromaprint not found')
 		(opstr,operr)=fpproc.communicate()
+		opstr=opstr.split('\n')
 		if operr!='' :
 			if operr.split('\n')[0]=="ERROR: couldn't find any audio stream in the file":
 				raise FingerprintError(2,'Invalid audio source')
-		
-		fingerprint=opstr[-1][opstr[-1].index('=')+1:-1]
-		duration=opstr[-2][opstr[-2].index('=')+1:-1]
+		fingerprint=opstr[-2][opstr[-2].index('=')+1:]
+		duration=opstr[-3][opstr[-3].index('=')+1:]
 		return (fingerprint, duration)
 		
 def acoustid_query(fingerprint, duration, meta='recordingids', apikey='8XaBELgH'):
