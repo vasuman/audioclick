@@ -20,14 +20,16 @@ def generate_track(rec_info,final_release):
 
 def extract_year(release):
 	if 'date' in release.keys() : 
-		year=int(release['date'][:4])
+		year=int(release['date'].replace('-',''))
+		if len(release['date'])==4:
+			year=int(release['date']+'1231')
 		return year
 	return -1
 
 def find_oldest_release(releases):
 	releases.sort(key=extract_year)
 	for release in releases:
-		if 'date' in release.keys() :
+		if 'date' in release.keys() and release['status']=='Official':
 			return release
 
 def single_match(mbids):
