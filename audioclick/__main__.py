@@ -52,7 +52,7 @@ def write_tags_to_file(track,audiofile,img_data=''):
 def rename_file(track,audiofile):
 	directory=os.path.dirname(audiofile)
 	src=audiofile
-	trackname=u"{0} - {1}.{2}".format(track['artist'],track['title'],audiofile[-3:].lower())
+	trackname=u"{0[artist]} - {0[title]}.{1}".format(track,audiofile[-3:])
 	dst=os.path.join(directory,trackname)
 	os.rename(src,dst)
 
@@ -80,7 +80,7 @@ def fingerprint_file(afile):
 		if e.errno==1:
 			log.critical('Chromaprint is not installed')
 		elif e.errno==2:
-			log.warning('File {0} doesn\'t have a valid audio stream. Skipping...'.format(afile))
+			log.warning('File {0} doesn\'t have a valid audio stream. Skipping...'.format(os.path.basename(afile)))
 			return (1,None)
 	query=acoustid_query(fp.fingerprint,fp.duration)
 	try:
@@ -111,11 +111,11 @@ def tag_file(afile,parsed_result):
 	log.info('File {0} matched with {1}% accuracy'.format(os.path.basename(afile),parsed_result.scores[best_match]*100))
 	#Lookin up MusicBrainz database
 	track=mblookup.single_match(mbids)
-	log.info('{0} identified as {1} by {2}'.format(os.path.basename(afile), track['title'], track['artist']))
+	log.info('{0} identified as {1[title]} by {1[artist]}'.format(os.path.basename(afile), track))
 	#Fetching Cover art
 	(img_ret,img_data)=mblookup.fetch_cover_art(track['musicbrainz_albumid'])
 	if img_ret:
-		log.warning('Album {0} doesn\'t have a cover image'.format(track['album']))
+		log.warning('Album {0[album]} doesn\'t have a cover image'.format(track))
 	#Cleaning up tags and filenames
 	write_tags_to_file(track,afile)
 	rename_file(track,afile)
@@ -128,6 +128,11 @@ if __name__=='__main__':
 	log.info('New instance started')
 	directory=os.path.abspath(sys.argv[1])
 	if not os.path.isdir(directory):
-		log.critical('{0} is not a directory'.format(directory))
-		sys.exit(1)
+		afile=directory.replace('\\','')
+		(return_code,parsed_result)=fingerprint_file(afile)
+		if return_code in (2,3):
+			log.critical('Critical Error! Terminating....')
+			sys.exit(return_code)
+		tag_file(afile,parsed_result)
+		sys.exit(0)
 	sys.exit(tag_all_files(directory))
