@@ -54,22 +54,6 @@ def match_recording(mbids):
 		release_list.extend(mbid_rlist)
 	return (mbid_rec, release_list)
 
-def fetch_cover_art(release_mbid):
-#	query_url='http://coverartarchive.org/release/{0}'.format(release_mbid)
-#	try:
-#		response=urllib2.urlopen(query_url)
-#	except urllib2.HTTPError as e:
-#		if e.code==404:
-#			return (1,'')
-#	result=json.loads(response.read())['images']
-#	if result==[]:
-#		return (2,'')
-#	img_url=result[0]['image']
-#	img_data=urllib2.urlopen(img_url)
-#	return (0,img_data)
-	return (1,'')
-
-	
 #Yet to be implemented
 def album_match(tracked_mbids):
 	all_releases=[]
