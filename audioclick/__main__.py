@@ -1,10 +1,10 @@
 #!/usr/bin/python2 -tt
-
 import mutagen
 from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, APIC
+from mutagen.id3 import ID3, APIC, error
 from mutagen.easyid3 import EasyID3
 from fingerprint import *
+import coverart
 import mblookup
 import os
 import sys
@@ -27,24 +27,21 @@ def tag_id3(track,audiofile,img_data):
 	for item in track.keys():
 		if item in id3obj.valid_keys.keys():
 			id3obj[item]=track[item]
-	if not img_data=='':
-		afile_id3=MP3(audiofile, ID3=ID3)
-		afile_id3.tags.add(
-			APIC(
-				encoding=3,
-				mime='image/jpeg',
-				type=3,
-				desc=u'Cover',
-				data=img_data
-			)
-		)
-		afile_id3.save(audiofile)
 	id3obj.save(audiofile)
+	if not img_data is None:
+		afile_id3=MP3(audiofile, ID3=ID3)
+		try:
+			afile_id3.add_tags()
+		except error:
+			log.info("Adding Album Art ID3 header for file {0}".format(audiofile))
+		coverart_tag=APIC(encoding=3,mime='image/png',type=2,desc=u'Cover',data=img_data)
+		afile_id3.tags.add(coverart_tag)
+		afile_id3.save(audiofile)
 
 #Add extensions and corresponding tag functions 
 tag_function={'mp3':tag_id3}
 
-def write_tags_to_file(track,audiofile,img_data=''):
+def write_tags_to_file(track,audiofile,img_data):
 	global tag_function
 	extension=audiofile[-3:].lower()
 	tag_function[extension](track,audiofile,img_data)
@@ -113,11 +110,13 @@ def tag_file(afile,parsed_result):
 	track=mblookup.single_match(mbids)
 	log.info('{0} identified as {1[title]} by {1[artist]}'.format(os.path.basename(afile), track))
 	#Fetching Cover art
-	(img_ret,img_data)=mblookup.fetch_cover_art(track['musicbrainz_albumid'])
-	if img_ret:
-		log.warning('Album {0[album]} doesn\'t have a cover image'.format(track))
+	(img_ret,img_data)=coverart.lookup_lastfm(track['musicbrainz_albumid'])
+	if img_ret in (1,2):
+		log.critical('Problem connecting to album art server')
+	elif img_ret is 3:
+		log.warning('Album {0[album]} doesn\'t seem to have a cover image'.format(track))
 	#Cleaning up tags and filenames
-	write_tags_to_file(track,afile)
+	write_tags_to_file(track,afile,img_data)
 	rename_file(track,afile)
 	#Success
 	return 0
@@ -128,6 +127,7 @@ if __name__=='__main__':
 	log.info('New instance started')
 	directory=os.path.abspath(sys.argv[1])
 	if not os.path.isdir(directory):
+		
 		afile=directory.replace('\\','')
 		(return_code,parsed_result)=fingerprint_file(afile)
 		if return_code in (2,3):
