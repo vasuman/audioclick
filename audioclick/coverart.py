@@ -1,12 +1,13 @@
 import urllib2
 import xml.dom.minidom
+import json
+
 def lookup_query(query_url):
 	try:
 		response=urllib2.urlopen(query_url)
 	except urllib2.HTTPError as e:
 		if e.code is 404:
 			return (1,None)
-			logging.warnin
 		elif e.code is 400:
 			return (2,None)
 	return (0,response)
@@ -36,4 +37,4 @@ def lookup_lastfm(release_mbid, api_key='9ffdbe28feea0fe7cb8fc25e9dd14215'):
 			img_url=image_tag.childNodes[0].toxml()
 			img_data=urllib2.urlopen(img_url).read()
 			return (0,img_data)
-	return(1,None)
+	return(3,None)
