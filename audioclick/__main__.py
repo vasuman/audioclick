@@ -43,13 +43,13 @@ tag_function={'mp3':tag_id3}
 
 def write_tags_to_file(track,audiofile,img_data):
 	global tag_function
-	extension=audiofile[-3:].lower()
+	extension=audiofile[:].lower()
 	tag_function[extension](track,audiofile,img_data)
 
 def rename_file(track,audiofile):
 	directory=os.path.dirname(audiofile)
 	src=audiofile
-	trackname=u"{0[artist]} - {0[title]}.{1}".format(track,audiofile[-3:])
+	trackname=u"{0[artist]} - {0[title]}.{1}".format(track,audiofile[audiofile.rindex('.')+1:])
 	dst=os.path.join(directory,trackname)
 	os.rename(src,dst)
 
@@ -59,7 +59,7 @@ def tag_all_files(directory):
 	afiles=[]
 	files=os.listdir(directory)
 	for file in files:
-		if file[-3:] in supported_extensions:
+		if file[file.rindex('.')+1:] in supported_extensions:
 			afiles.append(file)
 	for afile in afiles:
 		afile_abspath=os.path.abspath(os.path.join(directory,afile))
@@ -127,8 +127,10 @@ if __name__=='__main__':
 	log.info('New instance started')
 	directory=os.path.abspath(sys.argv[1])
 	if not os.path.isdir(directory):
-		
 		afile=directory.replace('\\','')
+		if not os.path.exists(afile):
+			log.critical('File doesn\'t exist!! Exiting..')
+			sys.exit(1)
 		(return_code,parsed_result)=fingerprint_file(afile)
 		if return_code in (2,3):
 			log.critical('Critical Error! Terminating....')
