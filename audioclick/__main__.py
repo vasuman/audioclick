@@ -37,13 +37,15 @@ def tag_id3(track,audiofile,img_data):
 		coverart_tag=APIC(encoding=3,mime='image/png',type=2,desc=u'Cover',data=img_data)
 		afile_id3.tags.add(coverart_tag)
 		afile_id3.save(audiofile)
+	else:
+		log.warning('No Album Art for for {0[album]}'.format(track))
 
 #Add extensions and corresponding tag functions 
 tag_function={'mp3':tag_id3}
 
 def write_tags_to_file(track,audiofile,img_data):
 	global tag_function
-	extension=audiofile[:].lower()
+	extension=audiofile[audiofile.rindex('.')+1:].lower()
 	tag_function[extension](track,audiofile,img_data)
 
 def rename_file(track,audiofile):
@@ -100,15 +102,17 @@ def tag_file(afile,parsed_result):
 		return 1
 	#Arbitrary function to extract AcoustID score
 	score_key = lambda acoustid : int(parsed_result.scores[acoustid])
-	#Ranking according to AcoustID score
-	parsed_result.acoustids.sort(key=score_key)
 	#Finding best match
 	best_match=max(parsed_result.mbids.keys(), key=score_key)
 	mbids=parsed_result.mbids[best_match]
 	log.info('File {0} matched with {1}% accuracy'.format(os.path.basename(afile),parsed_result.scores[best_match]*100))
 	#Lookin up MusicBrainz database
-	track=mblookup.single_match(mbids)
+	track,releases=mblookup.single_match(mbids)
 	log.info('{0} identified as {1[title]} by {1[artist]}'.format(os.path.basename(afile), track))
+	opt=raw_input("Is that right?[Y/n] : ")
+	if opt in ('n','N'):
+		parsed_result.mbids.pop(best_match)
+		return tag_file(afile,parsed_result)
 	#Fetching Cover art
 	(img_ret,img_data)=coverart.lookup_lastfm(track['musicbrainz_albumid'])
 	if img_ret in (1,2):
