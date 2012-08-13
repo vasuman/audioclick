@@ -34,6 +34,8 @@ def lookup_lastfm(release_mbid, api_key='9ffdbe28feea0fe7cb8fc25e9dd14215'):
 	image_tags=doc.getElementsByTagName('image')
 	for image_tag in image_tags:
 		if image_tag.getAttribute('size') == 'extralarge':
+			if not image_tag.childNodes:
+				return (4,None)
 			img_url=image_tag.childNodes[0].toxml()
 			img_data=urllib2.urlopen(img_url).read()
 			return (0,img_data)
